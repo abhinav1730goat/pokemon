@@ -1,0 +1,2312 @@
+Save this as **`pokemon-arena.html`** and open it in a browser. It needs an internet connection to load the PokéAPI catalogue and Pokémon artwork. You can search the available Pokémon and forms, choose six, and battle with familiar moves, type matchups, status effects, and animations.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon Team Arena</title>
+<style>
+  :root {
+    --ink: #202743;
+    --muted: #73809b;
+    --paper: #f4f6fc;
+    --panel: #ffffff;
+    --line: #e5e9f3;
+    --purple: #6656e8;
+    --purple-dark: #4e41c6;
+    --yellow: #ffd565;
+    --shadow: 0 16px 45px rgba(35, 44, 85, .09);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: Inter, ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(119, 103, 255, .13), transparent 27rem),
+      radial-gradient(circle at 92% 5%, rgba(255, 213, 101, .19), transparent 24rem),
+      var(--paper);
+  }
+
+  button, input { font: inherit; }
+  button { color: inherit; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px clamp(16px, 4vw, 48px);
+    border-bottom: 1px solid rgba(222, 227, 240, .85);
+    background: rgba(255, 255, 255, .78);
+    backdrop-filter: blur(12px);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    border-radius: 16px;
+    color: #fff;
+    font-size: 25px;
+    background: linear-gradient(145deg, #8171ff, #5746df);
+    box-shadow: 0 8px 18px rgba(102, 86, 232, .25);
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: .06em;
+  }
+
+  .brand h1 span { color: var(--purple); }
+
+  .brand p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .catalog-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: #5e6882;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .catalog-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #48c997;
+    box-shadow: 0 0 0 4px rgba(72, 201, 151, .13);
+  }
+
+  .page {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+    padding: 28px 22px 58px;
+  }
+
+  .page-heading {
+    margin: 0 0 22px;
+  }
+
+  .eyebrow {
+    margin: 0 0 8px;
+    color: var(--purple);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+  }
+
+  .page-heading h2,
+  .section-heading h2 {
+    margin: 0;
+    font-size: clamp(26px, 4vw, 36px);
+    letter-spacing: -.04em;
+  }
+
+  .page-heading p,
+  .section-heading p {
+    max-width: 700px;
+    margin: 8px 0 0;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .builder-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    min-width: 0;
+    padding: 21px;
+    border: 1px solid rgba(225, 229, 241, .95);
+    border-radius: 23px;
+    background: rgba(255, 255, 255, .94);
+    box-shadow: var(--shadow);
+  }
+
+  .panel-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .panel-heading h3 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: -.02em;
+  }
+
+  .panel-heading p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .entry-count, .team-count {
+    padding: 7px 10px;
+    border-radius: 999px;
+    color: #5b51c9;
+    background: #f0eeff;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    color: #939bb0;
+    pointer-events: none;
+  }
+
+  .search-input {
+    width: 100%;
+    height: 48px;
+    padding: 0 14px 0 42px;
+    border: 1px solid #dfe4f0;
+    border-radius: 14px;
+    outline: none;
+    background: #fbfcff;
+    transition: border-color .16s, box-shadow .16s;
+  }
+
+  .search-input:focus {
+    border-color: #988eff;
+    box-shadow: 0 0 0 4px rgba(102, 86, 232, .11);
+  }
+
+  .result-count {
+    margin: 0 2px 9px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .result-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: 418px;
+    overflow: auto;
+    padding-right: 3px;
+  }
+
+  .result-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid #e9ecf4;
+    border-radius: 14px;
+    text-align: left;
+    background: #fff;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s, background .15s;
+  }
+
+  .result-card:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: #b8b0ff;
+    background: #fbfaff;
+  }
+
+  .result-card:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+
+  .result-thumb {
+    display: grid;
+    place-items: center;
+    width: 43px;
+    height: 43px;
+    flex: 0 0 auto;
+    border-radius: 13px;
+    background: #f2f4fb;
+  }
+
+  .result-thumb img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+  }
+
+  .result-copy {
+    min-width: 0;
+  }
+
+  .result-copy strong {
+    display: block;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-copy small {
+    display: block;
+    margin-top: 3px;
+    color: #929ab0;
+    font-size: 10px;
+  }
+
+  .empty-results {
+    grid-column: 1 / -1;
+    padding: 25px 12px;
+    border: 1px dashed #dfe3ee;
+    border-radius: 14px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .team-slots {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .team-slot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 76px;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #e8ebf4;
+    border-radius: 15px;
+    background: #fcfcff;
+  }
+
+  .team-slot.empty {
+    justify-content: center;
+    border-style: dashed;
+    color: #a0a8ba;
+    background: #fbfcff;
+  }
+
+  .empty-slot-mark {
+    display: grid;
+    place-items: center;
+    width: 31px;
+    height: 31px;
+    border: 1px dashed #c8cedd;
+    border-radius: 50%;
+    font-size: 17px;
+  }
+
+  .empty-slot-text {
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .team-avatar {
+    display: grid;
+    place-items: center;
+    width: 49px;
+    height: 49px;
+    flex: 0 0 auto;
+    border-radius: 14px;
+    background: #f0f2fa;
+  }
+
+  .team-avatar img {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+  }
+
+  .team-copy {
+    min-width: 0;
+    padding-right: 20px;
+  }
+
+  .team-copy small, .team-copy strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .team-copy small {
+    color: #999fb1;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .team-copy strong {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .remove-slot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    display: grid;
+    place-items: center;
+    width: 23px;
+    height: 23px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: #8c94a8;
+    background: #f1f2f7;
+    cursor: pointer;
+    font-size: 15px;
+  }
+
+  .remove-slot:hover:not(:disabled) {
+    color: #ca4b61;
+    background: #fff0f2;
+  }
+
+  .team-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 15px;
+    border-top: 1px solid #edf0f6;
+  }
+
+  .team-hint {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 0 15px;
+    border: 1px solid transparent;
+    border-radius: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .15s, background .15s, box-shadow .15s;
+  }
+
+  .button:hover:not(:disabled) { transform: translateY(-1px); }
+  .button:disabled { opacity: .48; cursor: not-allowed; }
+
+  .button-primary {
+    color: #fff;
+    background: linear-gradient(135deg, #7564f5, #5848d7);
+    box-shadow: 0 8px 18px rgba(102, 86, 232, .2);
+  }
+
+  .button-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6655e9, #493bbf);
+  }
+
+  .button-soft {
+    color: #6055cf;
+    border-color: #e3e0ff;
+    background: #f6f4ff;
+  }
+
+  .button-quiet {
+    color: #626d87;
+    border-color: #e4e8f1;
+    background: #fff;
+  }
+
+  .setup-error {
+    margin: 13px 0 0;
+    color: #b74352;
+    font-size: 12px;
+  }
+
+  .fine-print {
+    margin: 14px 2px 0;
+    color: #929bb0;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* Battle screen */
+  .battle-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 17px;
+  }
+
+  .battle-heading h2 {
+    margin: 0;
+    font-size: clamp(23px, 4vw, 32px);
+    letter-spacing: -.04em;
+  }
+
+  .battle-heading p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .arena {
+    position: relative;
+    height: 430px;
+    overflow: hidden;
+    border: 1px solid rgba(188, 204, 227, .7);
+    border-radius: 26px;
+    background: linear-gradient(180deg, #dff2ff 0%, #eef8ff 53%, #dcefd5 54%, #b7d998 100%);
+    box-shadow: 0 18px 42px rgba(45, 77, 122, .12);
+    isolation: isolate;
+  }
+
+  .arena::before {
+    position: absolute;
+    top: 34px;
+    right: 18%;
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 232, 150, .95), rgba(255, 226, 140, .14) 72%);
+    content: "";
+  }
+
+  .arena-ground {
+    position: absolute;
+    z-index: -1;
+    right: -8%;
+    bottom: -60px;
+    left: -8%;
+    height: 190px;
+    border-radius: 50% 50% 0 0 / 28% 28% 0 0;
+    background: linear-gradient(180deg, #c7e4a3, #91c275);
+  }
+
+  .arena-hill {
+    position: absolute;
+    z-index: -2;
+    bottom: 90px;
+    width: 48%;
+    height: 110px;
+    border-radius: 50% 50% 0 0;
+    background: rgba(135, 194, 121, .38);
+  }
+
+  .arena-hill.left { left: -13%; }
+  .arena-hill.right { right: -12%; height: 145px; }
+
+  .arena-ring {
+    position: absolute;
+    z-index: -1;
+    width: 265px;
+    height: 74px;
+    border: 2px solid rgba(80, 148, 94, .3);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .13);
+  }
+
+  .arena-ring.enemy { top: 31%; right: 12%; }
+  .arena-ring.player { bottom: 9%; left: 9%; width: 315px; height: 87px; }
+
+  .arena-stamp {
+    position: absolute;
+    z-index: 3;
+    padding: 6px 10px;
+    border: 1px solid rgba(255,255,255,.75);
+    border-radius: 999px;
+    background: rgba(255,255,255,.72);
+    color: #64718a;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .13em;
+    backdrop-filter: blur(7px);
+  }
+
+  .arena-stamp--enemy { top: 15px; right: 16px; }
+  .arena-stamp--player { bottom: 14px; left: 16px; }
+
+  .versus-mark {
+    position: absolute;
+    z-index: 1;
+    top: 48%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    transform: translate(-50%, -50%) rotate(-8deg);
+    border: 2px solid rgba(255,255,255,.9);
+    border-radius: 14px;
+    color: white;
+    background: rgba(102, 86, 232, .7);
+    box-shadow: 0 5px 15px rgba(72, 72, 131, .18);
+    font-size: 12px;
+    font-weight: 1000;
+  }
+
+  .fighter {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fighter--enemy { top: 8%; right: 5%; }
+  .fighter--player {
+    bottom: 2%;
+    left: 3%;
+    flex-direction: row-reverse;
+  }
+
+  .fighter-art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: clamp(155px, 19vw, 225px);
+    aspect-ratio: 1;
+    flex: 0 0 auto;
+  }
+
+  .fighter-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 8px rgba(44, 68, 76, .24));
+  }
+
+  .fighter-art.is-attacking img {
+    animation: lunge .48s ease-in-out;
+  }
+
+  .fighter-art.is-hit img {
+    animation: hit-shake .52s ease-in-out;
+  }
+
+  .impact {
+    position: absolute;
+    z-index: 2;
+    width: 42%;
+    height: 42%;
+    border: 5px solid var(--impact-color, #fff);
+    border-radius: 48% 52% 44% 56%;
+    opacity: 0;
+    box-shadow: 0 0 20px var(--impact-color, #fff), inset 0 0 14px var(--impact-color, #fff);
+    pointer-events: none;
+    animation: impact-burst .52s ease-out forwards;
+  }
+
+  .pokemon-panel {
+    width: 220px;
+    padding: 12px 14px 11px;
+    border: 1px solid rgba(255,255,255,.85);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .92);
+    box-shadow: 0 8px 23px rgba(42, 61, 80, .12);
+    backdrop-filter: blur(8px);
+  }
+
+  .mon-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .mon-title strong {
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .level {
+    flex: 0 0 auto;
+    color: #8b94a9;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .type-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0 9px;
+  }
+
+  .type-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .03em;
+  }
+
+  .hp-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e8ebf1;
+  }
+
+  .hp-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #47c895, #75d98c);
+    transition: width .35s ease;
+  }
+
+  .hp-fill--mid { background: linear-gradient(90deg, #f0c644, #f4a949); }
+  .hp-fill--low { background: linear-gradient(90deg, #ef7376, #df4f65); }
+
+  .hp-caption {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    color: #7c879f;
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    margin-top: 7px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: #fff;
+    background: #7e6bdc;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: .08em;
+  }
+
+  .status-pill--burn { background: #e97846; }
+  .status-pill--poison { background: #9a61c2; }
+  .status-pill--paralysis { background: #c39b22; }
+  .status-pill--freeze { background: #4a9cc0; }
+
+  .battle-console {
+    display: grid;
+    grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .console-panel {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 21px;
+    background: #fff;
+    box-shadow: var(--shadow);
+  }
+
+  .console-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+
+  .console-title h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .turn-indicator {
+    padding: 6px 9px;
+    border-radius: 999px;
+    color: #6255d1;
+    background: #f1efff;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .battle-log {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-height: 92px;
+  }
+
+  .log-line {
+    margin: 0;
+    color: #8791a7;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .log-line.latest {
+    color: #303a56;
+    font-weight: 800;
+  }
+
+  .battle-tip {
+    margin: 13px 0 0;
+    padding-top: 11px;
+    border-top: 1px solid #edf0f5;
+    color: #8b94a8;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .move-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .move-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 62px;
+    overflow: hidden;
+    padding: 9px 11px 9px 14px;
+    border: 1px solid #e8ebf2;
+    border-radius: 14px;
+    text-align: left;
+    background: #fff;
+    cursor: pointer;
+    transition: transform .14s, border-color .14s, background .14s;
+  }
+
+  .move-button::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    background: var(--move-color, #888);
+    content: "";
+  }
+
+  .move-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--move-color, #bbb);
+    background: #fcfcff;
+  }
+
+  .move-button:disabled { opacity: .54; cursor: not-allowed; }
+
+  .move-copy { min-width: 0; }
+
+  .move-copy strong {
+    display: block;
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .move-copy small {
+    display: block;
+    margin-top: 4px;
+    color: #929bb0;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .move-power {
+    display: grid;
+    place-items: center;
+    min-width: 32px;
+    height: 28px;
+    padding: 0 5px;
+    border-radius: 9px;
+    color: #66708a;
+    background: #f2f4f8;
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .switch-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 15px 0 8px;
+    color: #6e7890;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .switch-list {
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    padding: 2px 1px 4px;
+  }
+
+  .switch-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px 8px 5px 5px;
+    border: 1px solid #e8ebf2;
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .switch-chip:hover:not(:disabled) {
+    border-color: #bbb3ff;
+    background: #faf9ff;
+  }
+
+  .switch-chip:disabled { opacity: .43; cursor: not-allowed; }
+
+  .switch-chip img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .switch-chip span {
+    max-width: 91px;
+    overflow: hidden;
+    font-size: 9px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+  }
+
+  /* Results / loading */
+  .result-wrap, .center-state {
+    width: min(760px, 100%);
+    margin: 20px auto;
+    padding: 30px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    background: #fff;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+
+  .result-icon {
+    display: grid;
+    place-items: center;
+    width: 78px;
+    height: 78px;
+    margin: 0 auto 14px;
+    border: 1px solid #e9e4ff;
+    border-radius: 25px;
+    background: #f3f0ff;
+    font-size: 37px;
+  }
+
+  .result-wrap h2, .center-state h2 {
+    margin: 0;
+    font-size: clamp(26px, 5vw, 36px);
+    letter-spacing: -.04em;
+  }
+
+  .result-wrap > p, .center-state > p {
+    max-width: 540px;
+    margin: 9px auto 20px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .result-stats {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 18px 0;
+  }
+
+  .result-stat {
+    min-width: 125px;
+    padding: 12px;
+    border: 1px solid #eceef5;
+    border-radius: 14px;
+    background: #fbfcff;
+  }
+
+  .result-stat strong { display: block; font-size: 20px; }
+  .result-stat span { color: var(--muted); font-size: 10px; }
+
+  .result-rosters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 20px 0;
+    text-align: left;
+  }
+
+  .roster-box {
+    padding: 13px;
+    border: 1px solid #eceef5;
+    border-radius: 16px;
+    background: #fcfcff;
+  }
+
+  .roster-box h3 {
+    margin: 0 0 9px;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .roster-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .result-mon {
+    min-width: 0;
+    padding: 6px 3px;
+    border-radius: 10px;
+    text-align: center;
+    background: #fff;
+  }
+
+  .result-mon.fainted { opacity: .45; filter: grayscale(1); }
+
+  .result-mon img {
+    display: block;
+    width: 39px;
+    height: 39px;
+    margin: 0 auto 3px;
+    object-fit: contain;
+  }
+
+  .result-mon strong {
+    display: block;
+    overflow: hidden;
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-mon small {
+    display: block;
+    margin-top: 2px;
+    color: #929bb0;
+    font-size: 8px;
+  }
+
+  .result-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .spinner {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto 16px;
+    border: 4px solid #e9e7fb;
+    border-top-color: var(--purple);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+
+  /* Type colors */
+  .type-normal { color: #5d5b39; background: #e8e7c9; }
+  .type-fire { color: #9d4217; background: #ffdfc9; }
+  .type-water { color: #215d9a; background: #d5eaff; }
+  .type-electric { color: #84620a; background: #fff0b2; }
+  .type-grass { color: #31733f; background: #d8f0d1; }
+  .type-ice { color: #287b89; background: #d8f4f3; }
+  .type-fighting { color: #982e38; background: #ffd9dc; }
+  .type-poison { color: #71398f; background: #ecd9fa; }
+  .type-ground { color: #8d6030; background: #f2dfc5; }
+  .type-flying { color: #5764ad; background: #e0e4ff; }
+  .type-psychic { color: #a33b72; background: #ffdeef; }
+  .type-bug { color: #667a1a; background: #edf2c5; }
+  .type-rock { color: #786331; background: #eee3c7; }
+  .type-ghost { color: #574a8e; background: #e6e0ff; }
+  .type-dragon { color: #5141a0; background: #e3ddff; }
+  .type-dark { color: #514b57; background: #e4e0e6; }
+  .type-steel { color: #586b79; background: #e1e8ee; }
+  .type-fairy { color: #a44270; background: #ffe1ef; }
+
+  .loading-copy { color: var(--muted); font-size: 13px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes lunge {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    40% { transform: translate(-13px, -8px) scale(1.06); }
+    70% { transform: translate(7px, 2px) scale(1.02); }
+  }
+  @keyframes hit-shake {
+    0%, 100% { transform: translateX(0); filter: brightness(1); }
+    20% { transform: translateX(-9px) rotate(-4deg); filter: brightness(1.5); }
+    45% { transform: translateX(8px) rotate(4deg); }
+    70% { transform: translateX(-5px); filter: brightness(1.25); }
+  }
+  @keyframes impact-burst {
+    0% { transform: scale(.2) rotate(0); opacity: 0; }
+    35% { transform: scale(1.18) rotate(35deg); opacity: .92; }
+    100% { transform: scale(1.55) rotate(70deg); opacity: 0; }
+  }
+
+  @media (max-width: 900px) {
+    .builder-grid { grid-template-columns: 1fr; }
+    .result-list { max-height: 350px; }
+    .battle-console { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .topbar { padding: 14px 15px; }
+    .brand-mark { width: 42px; height: 42px; border-radius: 14px; }
+    .brand h1 { font-size: 14px; }
+    .brand p { font-size: 10px; }
+    .catalog-chip { padding: 8px; font-size: 0; }
+    .catalog-dot { margin: 0; }
+    .page { padding: 22px 13px 40px; }
+    .panel { padding: 16px; border-radius: 19px; }
+    .result-list { grid-template-columns: 1fr; max-height: 330px; }
+    .team-slots { gap: 7px; }
+    .team-slot { min-height: 68px; padding: 7px; gap: 7px; }
+    .team-avatar { width: 42px; height: 42px; }
+    .team-avatar img { width: 40px; height: 40px; }
+    .team-copy strong { font-size: 10px; }
+    .team-actions { align-items: stretch; flex-direction: column; }
+    .team-hint { text-align: center; }
+    .team-actions .button { width: 100%; }
+    .battle-heading { align-items: flex-start; }
+    .battle-heading .button { min-height: 37px; padding: 0 10px; font-size: 11px; }
+    .arena { height: 535px; border-radius: 20px; }
+    .fighter {
+      gap: 0;
+    }
+    .fighter--enemy {
+      top: 8px;
+      right: 9px;
+      flex-direction: column-reverse;
+      align-items: flex-end;
+    }
+    .fighter--player {
+      bottom: 5px;
+      left: 9px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .fighter-art { width: clamp(125px, 33vw, 175px); }
+    .pokemon-panel { width: min(57vw, 220px); padding: 9px 11px; }
+    .mon-title strong { font-size: 12px; }
+    .arena-ring.enemy { top: 29%; right: 2%; width: 200px; }
+    .arena-ring.player { bottom: 9%; left: 1%; width: 235px; }
+    .versus-mark { top: 50%; width: 34px; height: 34px; }
+    .console-panel { padding: 15px; }
+    .move-grid { gap: 6px; }
+    .move-button { min-height: 57px; padding-right: 7px; }
+    .move-copy strong { font-size: 10px; }
+    .result-wrap, .center-state { padding: 22px 15px; }
+    .result-rosters { grid-template-columns: 1fr; }
+    .result-stats { gap: 6px; }
+    .result-stat { min-width: 0; flex: 1; padding: 10px 5px; }
+    .roster-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .result-mon img { width: 31px; height: 31px; }
+    .result-mon strong { font-size: 7px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const API = "https://pokeapi.co/api/v2";
+const LEVEL = 50;
+const app = document.getElementById("app");
+const detailCache = new Map();
+
+const state = {
+  loadingDex: true,
+  dexError: "",
+  dex: [],
+  team: [],
+  search: "",
+  screen: "setup",
+  battle: null,
+  loadingBattle: false,
+  setupError: ""
+};
+
+const TYPE_COLORS = {
+  normal: "#aaa984", fire: "#ed824c", water: "#5a9de1", electric: "#e2bb40",
+  grass: "#68b86e", ice: "#63bac5", fighting: "#d45c64", poison: "#a36bc1",
+  ground: "#bc8c54", flying: "#8895dc", psychic: "#dc72a4", bug: "#9daa46",
+  rock: "#aa9356", ghost: "#8173bc", dragon: "#7662d4", dark: "#766d79",
+  steel: "#8195a5", fairy: "#db81ac"
+};
+
+const TYPE_CHART = {
+  normal:   { super: [],                         resist: ["rock", "steel"],                     immune: ["ghost"] },
+  fire:     { super: ["grass", "ice", "bug", "steel"], resist: ["fire", "water", "rock", "dragon"], immune: [] },
+  water:    { super: ["fire", "ground", "rock"], resist: ["water", "grass", "dragon"],             immune: [] },
+  electric: { super: ["water", "flying"],        resist: ["electric", "grass", "dragon"],          immune: ["ground"] },
+  grass:    { super: ["water", "ground", "rock"], resist: ["fire", "grass", "poison", "flying", "bug", "dragon", "steel"], immune: [] },
+  ice:      { super: ["grass", "ground", "flying", "dragon"], resist: ["fire", "water", "ice", "steel"], immune: [] },
+  fighting: { super: ["normal", "ice", "rock", "dark", "steel"], resist: ["poison", "flying", "psychic", "bug", "fairy"], immune: ["ghost"] },
+  poison:   { super: ["grass", "fairy"],         resist: ["poison", "ground", "rock", "ghost"],    immune: ["steel"] },
+  ground:   { super: ["fire", "electric", "poison", "rock", "steel"], resist: ["grass", "bug"],    immune: ["flying"] },
+  flying:   { super: ["grass", "fighting", "bug"], resist: ["electric", "rock", "steel"],           immune: [] },
+  psychic:  { super: ["fighting", "poison"],     resist: ["psychic", "steel"],                     immune: ["dark"] },
+  bug:      { super: ["grass", "psychic", "dark"], resist: ["fire", "fighting", "poison", "flying", "ghost", "steel", "fairy"], immune: [] },
+  rock:     { super: ["fire", "ice", "flying", "bug"], resist: ["fighting", "ground", "steel"],     immune: [] },
+  ghost:    { super: ["psychic", "ghost"],       resist: ["dark"],                                 immune: ["normal"] },
+  dragon:   { super: ["dragon"],                 resist: ["steel"],                                immune: ["fairy"] },
+  dark:     { super: ["psychic", "ghost"],       resist: ["fighting", "dark", "fairy"],             immune: [] },
+  steel:    { super: ["ice", "rock", "fairy"],    resist: ["fire", "water", "electric", "steel"],   immune: [] },
+  fairy:    { super: ["fighting", "dragon", "dark"], resist: ["fire", "poison", "steel"],           immune: [] }
+};
+
+const M = (name, type, power, category = "Physical", accuracy = 100, effect = null) =>
+  ({ name, type, power, category, accuracy, effect });
+
+const MOVE_BANK = {
+  normal: [
+    M("Tackle", "normal", 40), M("Quick Attack", "normal", 40),
+    M("Swift", "normal", 60, "Special"), M("Body Slam", "normal", 85, "Physical", 100, { status: "paralysis", chance: .3 }),
+    M("Double-Edge", "normal", 120), M("Hyper Beam", "normal", 150, "Special", 90),
+    M("Facade", "normal", 70), M("Strength", "normal", 80)
+  ],
+  fire: [
+    M("Ember", "fire", 40, "Special", 100, { status: "burn", chance: .1 }),
+    M("Flame Wheel", "fire", 60, "Physical", 100, { status: "burn", chance: .1 }),
+    M("Flamethrower", "fire", 90, "Special", 100, { status: "burn", chance: .1 }),
+    M("Fire Blast", "fire", 110, "Special", 85, { status: "burn", chance: .1 }),
+    M("Fire Fang", "fire", 65, "Physical", 95, { status: "burn", chance: .1 }),
+    M("Heat Wave", "fire", 95, "Special", 90, { status: "burn", chance: .1 }),
+    M("Blaze Kick", "fire", 85, "Physical", 90, { status: "burn", chance: .1 }),
+    M("Flare Blitz", "fire", 120, "Physical", 100, { status: "burn", chance: .1 })
+  ],
+  water: [
+    M("Water Gun", "water", 40, "Special"), M("Bubble Beam", "water", 65, "Special"),
+    M("Surf", "water", 90, "Special"), M("Hydro Pump", "water", 110, "Special", 80),
+    M("Aqua Tail", "water", 90), M("Waterfall", "water", 80),
+    M("Liquidation", "water", 85), M("Crabhammer", "water", 100, "Physical", 90)
+  ],
+  grass: [
+    M("Vine Whip", "grass", 45), M("Razor Leaf", "grass", 55, "Physical", 95),
+    M("Mega Drain", "grass", 40, "Special"), M("Energy Ball", "grass", 90, "Special"),
+    M("Leaf Blade", "grass", 90), M("Solar Beam", "grass", 120, "Special"),
+    M("Seed Bomb", "grass", 80), M("Petal Blizzard", "grass", 90)
+  ],
+  electric: [
+    M("Thunder Shock", "electric", 40, "Special", 100, { status: "paralysis", chance: .1 }),
+    M("Spark", "electric", 65, "Physical", 100, { status: "paralysis", chance: .3 }),
+    M("Thunderbolt", "electric", 90, "Special", 100, { status: "paralysis", chance: .1 }),
+    M("Thunder", "electric", 110, "Special", 70, { status: "paralysis", chance: .3 }),
+    M("Discharge", "electric", 80, "Special", 100, { status: "paralysis", chance: .3 }),
+    M("Volt Tackle", "electric", 120, "Physical", 100, { status: "paralysis", chance: .1 }),
+    M("Wild Charge", "electric", 90, "Physical", 100, { status: "paralysis", chance: .1 }),
+    M("Thunder Punch", "electric", 75, "Physical", 100, { status: "paralysis", chance: .1 })
+  ],
+  ice: [
+    M("Ice Shard", "ice", 40, "Physical", 100, { status: "freeze", chance: .1 }),
+    M("Icy Wind", "ice", 55, "Special", 95, { status: "freeze", chance: .1 }),
+    M("Ice Beam", "ice", 90, "Special", 100, { status: "freeze", chance: .1 }),
+    M("Blizzard", "ice", 110, "Special", 70, { status: "freeze", chance: .1 }),
+    M("Avalanche", "ice", 60, "Physical", 100, { status: "freeze", chance: .1 }),
+    M("Frost Breath", "ice", 60, "Special", 90, { status: "freeze", chance: .1 }),
+    M("Icicle Crash", "ice", 85, "Physical", 90, { status: "freeze", chance: .1 })
+  ],
+  fighting: [
+    M("Low Kick", "fighting", 50), M("Brick Break", "fighting", 75),
+    M("Close Combat", "fighting", 120), M("Aura Sphere", "fighting", 80, "Special"),
+    M("Focus Blast", "fighting", 120, "Special", 70), M("Mach Punch", "fighting", 40),
+    M("Drain Punch", "fighting", 75), M("Cross Chop", "fighting", 100, "Physical", 80)
+  ],
+  poison: [
+    M("Poison Sting", "poison", 15, "Physical", 100, { status: "poison", chance: .3 }),
+    M("Sludge", "poison", 65, "Special", 100, { status: "poison", chance: .3 }),
+    M("Sludge Bomb", "poison", 90, "Special", 100, { status: "poison", chance: .3 }),
+    M("Poison Jab", "poison", 80, "Physical", 100, { status: "poison", chance: .3 }),
+    M("Venoshock", "poison", 65, "Special"), M("Gunk Shot", "poison", 120, "Physical", 80),
+    M("Acid", "poison", 40, "Special")
+  ],
+  ground: [
+    M("Mud-Slap", "ground", 20, "Special"), M("Dig", "ground", 80),
+    M("Earthquake", "ground", 100), M("Earth Power", "ground", 90, "Special"),
+    M("Drill Run", "ground", 80, "Physical", 95),
+    M("High Horsepower", "ground", 95, "Physical", 95),
+    M("Bulldoze", "ground", 60)
+  ],
+  flying: [
+    M("Peck", "flying", 35), M("Wing Attack", "flying", 60),
+    M("Air Slash", "flying", 75, "Special", 95), M("Aerial Ace", "flying", 60),
+    M("Brave Bird", "flying", 120), M("Hurricane", "flying", 110, "Special", 70),
+    M("Acrobatics", "flying", 55)
+  ],
+  psychic: [
+    M("Confusion", "psychic", 50, "Special"),
+    M("Psybeam", "psychic", 65, "Special"),
+    M("Psychic", "psychic", 90, "Special"),
+    M("Psyshock", "psychic", 80, "Special"),
+    M("Future Sight", "psychic", 120, "Special"),
+    M("Zen Headbutt", "psychic", 80, "Physical", 90)
+  ],
+  bug: [
+    M("Bug Bite", "bug", 60), M("X-Scissor", "bug", 80),
+    M("Bug Buzz", "bug", 90, "Special"), M("U-turn", "bug", 70),
+    M("Leech Life", "bug", 80), M("Megahorn", "bug", 120, "Physical", 85),
+    M("Pin Missile", "bug", 25, "Physical", 95)
+  ],
+  rock: [
+    M("Rock Throw", "rock", 50, "Physical", 90), M("Rock Tomb", "rock", 60, "Physical", 95),
+    M("Rock Slide", "rock", 75, "Physical", 90), M("Stone Edge", "rock", 100, "Physical", 80),
+    M("Power Gem", "rock", 80, "Special"), M("Rock Blast", "rock", 25, "Physical", 90)
+  ],
+  ghost: [
+    M("Lick", "ghost", 30, "Physical", 100, { status: "paralysis", chance: .3 }),
+    M("Shadow Sneak", "ghost", 40), M("Shadow Ball", "ghost", 80, "Special"),
+    M("Shadow Claw", "ghost", 70), M("Phantom Force", "ghost", 90),
+    M("Hex", "ghost", 65, "Special")
+  ],
+  dragon: [
+    M("Dragon Breath", "dragon", 60, "Special", 100, { status: "paralysis", chance: .3 }),
+    M("Dragon Claw", "dragon", 80), M("Dragon Pulse", "dragon", 85, "Special"),
+    M("Draco Meteor", "dragon", 130, "Special", 90),
+    M("Outrage", "dragon", 120), M("Dragon Rush", "dragon", 100, "Physical", 75)
+  ],
+  dark: [
+    M("Bite", "dark", 60, "Physical", 100),
+    M("Foul Play", "dark", 95), M("Night Slash", "dark", 70),
+    M("Crunch", "dark", 80), M("Dark Pulse", "dark", 80, "Special"),
+    M("Knock Off", "dark", 65), M("Sucker Punch", "dark", 70)
+  ],
+  steel: [
+    M("Metal Claw", "steel", 50, "Physical", 95),
+    M("Iron Head", "steel", 80), M("Flash Cannon", "steel", 80, "Special"),
+    M("Steel Wing", "steel", 70, "Physical", 90),
+    M("Meteor Mash", "steel", 90, "Physical", 90),
+    M("Heavy Slam", "steel", 80)
+  ],
+  fairy: [
+    M("Fairy Wind", "fairy", 40, "Special"),
+    M("Draining Kiss", "fairy", 50, "Special"),
+    M("Dazzling Gleam", "fairy", 80, "Special"),
+    M("Moonblast", "fairy", 95, "Special"),
+    M("Play Rough", "fairy", 90, "Physical", 90),
+    M("Misty Explosion", "fairy", 100, "Special")
+  ]
+};
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
+
+function formatName(name) {
+  return String(name || "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function dexNumber(id) {
+  return "#" + String(id).padStart(4, "0");
+}
+
+function spriteURL(id) {
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+}
+
+function imageMarkup(src, id, alt, className = "") {
+  const fallback = spriteURL(id);
+  return `<img class="${escapeHTML(className)}"
+    src="${escapeHTML(src || fallback)}"
+    data-fallback="${escapeHTML(fallback)}"
+    alt="${escapeHTML(alt)}"
+    loading="lazy"
+    onerror="if(this.dataset.fallback && this.src !== this.dataset.fallback){this.src=this.dataset.fallback}else{this.style.display='none'}">`;
+}
+
+function typeColor(type) {
+  return TYPE_COLORS[type] || "#8892a7";
+}
+
+function renderHeader() {
+  const label = state.loadingDex
+    ? "Loading Pokédex"
+    : `${state.dex.length.toLocaleString()} catalogue entries`;
+
+  return `
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⚡</div>
+        <div>
+          <h1>POKÉMON <span>TEAM ARENA</span></h1>
+          <p>Choose your six. Take on a rival.</p>
+        </div>
+      </div>
+      <div class="catalog-chip"><span class="catalog-dot"></span>${escapeHTML(label)}</div>
+    </header>`;
+}
+
+function render() {
+  if (state.loadingDex) {
+    app.innerHTML = `${renderHeader()}
+      <main class="page">
+        <section class="center-state">
+          <div class="spinner"></div>
+          <h2>Opening the Pokédex…</h2>
+          <p class="loading-copy">Loading Pokémon and forms from PokéAPI.</p>
+        </section>
+      </main>`;
+    return;
+  }
+
+  if (state.dexError) {
+    app.innerHTML = `${renderHeader()}
+      <main class="page">
+        <section class="center-state">
+          <div class="result-icon">📡</div>
+          <h2>Couldn't load the Pokédex</h2>
+          <p>${escapeHTML(state.dexError)}</p>
+          <button class="button button-primary" data-retry>Try again</button>
+        </section>
+      </main>`;
+    return;
+  }
+
+  let content;
+  if (state.screen === "battle" && state.battle) {
+    content = renderBattle();
+  } else if (state.screen === "result" && state.battle) {
+    content = renderResult();
+  } else {
+    content = renderSetup();
+  }
+
+  app.innerHTML = `${renderHeader()}${content}`;
+}
+
+function renderSearchResults() {
+  const query = state.search.trim().toLowerCase();
+  const queryName = query.replace(/\s+/g, "-");
+  const numericQuery = query.replace(/^#/, "").replace(/^0+/, "");
+  const chosen = new Set(state.team.map(entry => entry.id));
+
+  const available = state.dex.filter(entry => !chosen.has(entry.id));
+  const matches = available.filter(entry => {
+    if (!query) return true;
+    const nameWithSpaces = entry.name.replace(/-/g, " ");
+    const numberMatch = /^\d+$/.test(numericQuery) &&
+      String(entry.id).startsWith(numericQuery);
+    return entry.name.includes(queryName) ||
+      nameWithSpaces.includes(query) ||
+      numberMatch;
+  }).slice(0, 12);
+
+  const heading = query
+    ? `Showing up to ${matches.length} match${matches.length === 1 ? "" : "es"}`
+    : `Browse the catalogue (${state.dex.length.toLocaleString()} entries)`;
+
+  if (!matches.length) {
+    return `<div class="result-count">${escapeHTML(heading)}</div>
+      <div class="result-list"><div class="empty-results">No Pokémon found. Try another name or number.</div></div>`;
+  }
+
+  return `<div class="result-count">${escapeHTML(heading)}</div>
+    <div class="result-list">
+      ${matches.map(entry => `
+        <button class="result-card" data-add-id="${entry.id}" ${state.loadingBattle || state.team.length >= 6 ? "disabled" : ""}>
+          <span class="result-thumb">${imageMarkup(spriteURL(entry.id), entry.id, formatName(entry.name))}</span>
+          <span class="result-copy">
+            <strong>${escapeHTML(formatName(entry.name))}</strong>
+            <small>${dexNumber(entry.id)} · Add to team</small>
+          </span>
+        </button>
+      `).join("")}
+    </div>`;
+}
+
+function renderTeamSlots() {
+  return Array.from({ length: 6 }, (_, index) => {
+    const entry = state.team[index];
+
+    if (!entry) {
+      return `<div class="team-slot empty">
+        <span class="empty-slot-mark">+</span>
+        <span class="empty-slot-text">Open slot ${index + 1}</span>
+      </div>`;
+    }
+
+    return `<div class="team-slot">
+      <div class="team-avatar">${imageMarkup(spriteURL(entry.id), entry.id, formatName(entry.name))}</div>
+      <div class="team-copy">
+        <small>Slot ${index + 1} · ${dexNumber(entry.id)}</small>
+        <strong>${escapeHTML(formatName(entry.name))}</strong>
+      </div>
+      <button class="remove-slot" data-remove="${index}" ${state.loadingBattle ? "disabled" : ""}
+        aria-label="Remove ${escapeHTML(formatName(entry.name))}">×</button>
+    </div>`;
+  }).join("");
+}
+
+function renderSetup() {
+  const ready = state.team.length === 6 && !state.loadingBattle;
+
+  return `<main class="page">
+    <section class="page-heading">
+      <div class="eyebrow">Team builder</div>
+      <h2>Choose your lineup</h2>
+      <p>Pick exactly six Pokémon. Search the PokéAPI catalogue for Pokémon and forms, then build your battle team.</p>
+    </section>
+
+    <div class="builder-grid">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Find Pokémon</h3>
+            <p>Search by name or Pokédex number.</p>
+          </div>
+          <span class="entry-count">${state.dex.length.toLocaleString()} entries</span>
+        </div>
+
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="pokemon-search" class="search-input" type="search"
+            value="${escapeHTML(state.search)}"
+            placeholder="Try Pikachu, Charizard, or #25"
+            autocomplete="off"
+            aria-label="Search Pokémon">
+        </div>
+
+        <div id="search-results">${renderSearchResults()}</div>
+        <p class="fine-print">Pokémon and forms are loaded from the public PokéAPI catalogue. Internet access is required.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Your team</h3>
+            <p>Choose six different catalogue entries.</p>
+          </div>
+          <span class="team-count">${state.team.length} / 6</span>
+        </div>
+
+        <div class="team-slots">${renderTeamSlots()}</div>
+
+        ${state.setupError ? `<p class="setup-error">${escapeHTML(state.setupError)}</p>` : ""}
+
+        <div class="team-actions">
+          <span class="team-hint">${state.team.length === 6
+            ? "Your squad is ready for battle!"
+            : `Choose ${6 - state.team.length} more Pokémon to start.`}</span>
+          <button class="button button-primary" data-start ${ready ? "" : "disabled"}>
+            ${state.loadingBattle ? "Preparing battle…" : "⚔ Start battle"}
+          </button>
+        </div>
+
+        <div style="margin-top:10px;text-align:right">
+          <button class="button button-soft" data-random-team ${state.loadingBattle ? "disabled" : ""}>
+            ✨ Random team
+          </button>
+        </div>
+      </section>
+    </div>
+  </main>`;
+}
+
+function getPokemonImage(data) {
+  return data.sprites?.other?.["official-artwork"]?.front_default ||
+    data.sprites?.other?.home?.front_default ||
+    data.sprites?.front_default ||
+    spriteURL(data.id);
+}
+
+function moveSlug(name) {
+  return String(name).toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function shuffle(array) {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function randomItem(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+function buildMoves(data, types) {
+  const typeMoves = types.flatMap(type => MOVE_BANK[type] || []);
+  const neutralMoves = types.includes("normal") ? [] : MOVE_BANK.normal;
+  const allMoves = [...typeMoves, ...neutralMoves];
+  if (!allMoves.length) allMoves.push(...MOVE_BANK.normal);
+
+  const learnedNames = new Set((data.moves || []).map(item => item.move.name));
+  const learnedPool = allMoves.filter(move => learnedNames.has(moveSlug(move.name)));
+
+  let pool = learnedPool.length >= 4
+    ? learnedPool
+    : [...learnedPool, ...allMoves.filter(move => !learnedPool.some(known => known.name === move.name))];
+
+  const unique = new Map(pool.map(move => [move.name, move]));
+  pool = [...unique.values()];
+
+  const selected = [];
+
+  // Try to give the Pokémon a move matching each of its types.
+  for (const type of types) {
+    if (selected.length >= 4) break;
+    const options = pool.filter(move =>
+      move.type === type && !selected.some(chosen => chosen.name === move.name)
+    );
+    if (options.length) selected.push(randomItem(options));
+  }
+
+  for (const move of shuffle(pool)) {
+    if (selected.length >= 4) break;
+    if (!selected.some(chosen => chosen.name === move.name)) selected.push(move);
+  }
+
+  for (const move of shuffle(allMoves)) {
+    if (selected.length >= 4) break;
+    if (!selected.some(chosen => chosen.name === move.name)) selected.push(move);
+  }
+
+  return selected.slice(0, 4).map(move => ({
+    ...move,
+    effect: move.effect ? { ...move.effect } : null
+  }));
+}
+
+function statAtLevel50(base, isHP = false) {
+  return isHP
+    ? Math.floor(((2 * base + 31) * LEVEL) / 100) + LEVEL + 10
+    : Math.floor(((2 * base + 31) * LEVEL) / 100) + 5;
+}
+
+function makeBattler(data) {
+  const types = (data.types || [])
+    .slice()
+    .sort((a, b) => a.slot - b.slot)
+    .map(item => item.type.name);
+
+  if (!types.length) types.push("normal");
+
+  const base = name => data.stats?.find(item => item.stat.name === name)?.base_stat || 60;
+  const maxHp = statAtLevel50(base("hp"), true);
+
+  return {
+    id: data.id,
+    name: data.name,
+    image: getPokemonImage(data),
+    types,
+    level: LEVEL,
+    stats: {
+      hp: maxHp,
+      attack: statAtLevel50(base("attack")),
+      defense: statAtLevel50(base("defense")),
+      "special-attack": statAtLevel50(base("special-attack")),
+      "special-defense": statAtLevel50(base("special-defense")),
+      speed: statAtLevel50(base("speed"))
+    },
+    maxHp,
+    hp: maxHp,
+    status: null,
+    moves: buildMoves(data, types)
+  };
+}
+
+async function fetchJSON(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json();
+}
+
+async function loadDex() {
+  state.loadingDex = true;
+  state.dexError = "";
+  render();
+
+  try {
+    let next = `${API}/pokemon?limit=2000`;
+    const rows = [];
+
+    while (next) {
+      const result = await fetchJSON(next);
+      rows.push(...result.results);
+      next = result.next;
+    }
+
+    const entries = new Map();
+    for (const row of rows) {
+      const match = row.url.match(/\/pokemon\/(\d+)\/?$/);
+      if (!match) continue;
+      const id = Number(match[1]);
+      if (!entries.has(id)) entries.set(id, { id, name: row.name, url: row.url });
+    }
+
+    state.dex = [...entries.values()].sort((a, b) => a.id - b.id);
+    if (!state.dex.length) throw new Error("No catalogue entries returned.");
+
+    state.loadingDex = false;
+    state.dexError = "";
+    render();
+  } catch (error) {
+    state.loadingDex = false;
+    state.dexError = "Check your internet connection, then try loading the Pokédex again.";
+    render();
+  }
+}
+
+function getPokemonDetails(entry) {
+  const url = entry.url || `${API}/pokemon/${entry.id}/`;
+
+  if (!detailCache.has(url)) {
+    const request = fetchJSON(url).catch(error => {
+      detailCache.delete(url);
+      throw error;
+    });
+    detailCache.set(url, request);
+  }
+
+  return detailCache.get(url);
+}
+
+function effectiveness(moveType, defenderTypes) {
+  const chart = TYPE_CHART[moveType];
+  if (!chart) return 1;
+
+  let result = 1;
+  for (const defenderType of defenderTypes) {
+    if (chart.immune.includes(defenderType)) return 0;
+    if (chart.super.includes(defenderType)) result *= 2;
+    if (chart.resist.includes(defenderType)) result *= .5;
+  }
+  return result;
+}
+
+function formatStatus(status) {
+  return ({
+    burn: "BURN",
+    poison: "POISON",
+    paralysis: "PARA",
+    freeze: "FROZEN"
+  })[status] || String(status || "").toUpperCase();
+}
+
+function addLog(message) {
+  if (!state.battle) return;
+  state.battle.logs.push(message);
+  if (state.battle.logs.length > 9) state.battle.logs.shift();
+}
+
+function activeMonster(side) {
+  const battle = state.battle;
+  if (!battle) return null;
+  return side === "player"
+    ? battle.playerTeam[battle.playerIndex]
+    : battle.enemyTeam[battle.enemyIndex];
+}
+
+function isStatusImmune(monster, status) {
+  const immunities = {
+    burn: ["fire"],
+    poison: ["poison", "steel"],
+    paralysis: ["electric"],
+    freeze: ["ice"]
+  };
+  return (immunities[status] || []).some(type => monster.types.includes(type));
+}
+
+function canMove(monster) {
+  if (monster.status === "paralysis" && Math.random() < .25) {
+    addLog(`${formatName(monster.name)} is paralyzed and can't move!`);
+    return false;
+  }
+
+  if (monster.status === "freeze") {
+    if (Math.random() < .2) {
+      monster.status = null;
+      addLog(`${formatName(monster.name)} thawed out!`);
+    } else {
+      addLog(`${formatName(monster.name)} is frozen solid!`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function applyResidualDamage(monster) {
+  if (monster.hp <= 0) return;
+
+  if (monster.status === "burn" || monster.status === "poison") {
+    const fraction = monster.status === "burn" ? 16 : 8;
+    const damage = Math.max(1, Math.floor(monster.maxHp / fraction));
+    monster.hp = Math.max(0, monster.hp - damage);
+    addLog(`${formatName(monster.name)} is hurt by ${monster.status} (-${damage} HP).`);
+  }
+}
+
+function tryMoveEffect(target, move) {
+  if (!move.effect || target.hp <= 0 || target.status) return;
+  if (isStatusImmune(target, move.effect.status)) return;
+  if (Math.random() >= move.effect.chance) return;
+
+  target.status = move.effect.status;
+  const pastTense = {
+    burn: "was burned",
+    poison: "was poisoned",
+    paralysis: "was paralyzed",
+    freeze: "was frozen"
+  }[target.status] || `was affected by ${target.status}`;
+
+  addLog(`${formatName(target.name)} ${pastTense}!`);
+}
+
+function resolveMove(attacker, defender, move) {
+  addLog(`${formatName(attacker.name)} used ${move.name}!`);
+
+  if (!canMove(attacker)) {
+    applyResidualDamage(attacker);
+    return;
+  }
+
+  if (Math.random() * 100 > move.accuracy) {
+    addLog(`${formatName(attacker.name)}'s attack missed!`);
+    applyResidualDamage(attacker);
+    return;
+  }
+
+  const multiplier = effectiveness(move.type, defender.types);
+
+  if (multiplier === 0) {
+    addLog(`It had no effect on ${formatName(defender.name)}!`);
+  } else {
+    const attackStat = move.category === "Special"
+      ? attacker.stats["special-attack"]
+      : attacker.stats.attack;
+    const defenseStat = move.category === "Special"
+      ? defender.stats["special-defense"]
+      : defender.stats.defense;
+
+    const baseDamage = Math.floor(
+      ((2 * LEVEL / 5 + 2) * move.power * attackStat / Math.max(1, defenseStat)) / 50
+    ) + 2;
+
+    const stab = attacker.types.includes(move.type) ? 1.5 : 1;
+    const critical = Math.random() < .0625;
+    const randomFactor = .85 + Math.random() * .15;
+    const damage = Math.max(1, Math.floor(
+      baseDamage * stab * multiplier * (critical ? 1.5 : 1) * randomFactor
+    ));
+
+    defender.hp = Math.max(0, defender.hp - damage);
+    addLog(`${formatName(defender.name)} took ${damage} damage${critical ? " — critical hit!" : ""}`);
+
+    if (multiplier >= 2) addLog("It's super effective!");
+    else if (multiplier <= .5) addLog("It's not very effective…");
+
+    if (defender.hp > 0) tryMoveEffect(defender, move);
+  }
+
+  applyResidualDamage(attacker);
+}
+
+async function animateAndResolve(side, move) {
+  const battle = state.battle;
+  const attacker = activeMonster(side);
+  const defender = activeMonster(side === "player" ? "enemy" : "player");
+
+  battle.animation = { actor: side, type: move.type };
+  render();
+  await new Promise(resolve => setTimeout(resolve, 540));
+
+  resolveMove(attacker, defender, move);
+  battle.animation = null;
+  render();
+}
+
+function handleFaints() {
+  const battle = state.battle;
+  const result = { over: false, playerChanged: false, enemyChanged: false };
+
+  for (const side of ["player", "enemy"]) {
+    const team = side === "player" ? battle.playerTeam : battle.enemyTeam;
+    const indexKey = side === "player" ? "playerIndex" : "enemyIndex";
+    const active = team[battle[indexKey]];
+
+    if (!active || active.hp > 0) continue;
+
+    addLog(`${formatName(active.name)} fainted!`);
+
+    const nextIndex = team.findIndex((monster, index) =>
+      index !== battle[indexKey] && monster.hp > 0
+    );
+
+    if (nextIndex < 0) {
+      battle.winner = side === "player" ? "enemy" : "player";
+      addLog(battle.winner === "player"
+        ? "Your team wins the battle!"
+        : "Your team has no Pokémon left!");
+      state.screen = "result";
+      state.loadingBattle = false;
+      result.over = true;
+      return result;
+    }
+
+    battle[indexKey] = nextIndex;
+    if (side === "player") result.playerChanged = true;
+    else result.enemyChanged = true;
+
+    const nextMonster = team[nextIndex];
+    addLog(side === "player"
+      ? `Go, ${formatName(nextMonster.name)}!`
+      : `The rival sent out ${formatName(nextMonster.name)}!`);
+  }
+
+  return result;
+}
+
+function chooseEnemyMove() {
+  const enemy = activeMonster("enemy");
+  const player = activeMonster("player");
+
+  const ranked = enemy.moves.map(move => {
+    const multiplier = effectiveness(move.type, player.types);
+    const stab = enemy.types.includes(move.type) ? 1.5 : 1;
+    return {
+      move,
+      score: (multiplier || .1) * move.power * stab * (move.accuracy / 100)
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  const bestOptions = ranked.slice(0, Math.min(3, ranked.length));
+  return randomItem(bestOptions).move;
+}
+
+async function takeEnemyTurn() {
+  if (!state.battle || state.screen !== "battle") return;
+
+  const move = chooseEnemyMove();
+  await animateAndResolve("enemy", move);
+  handleFaints();
+}
+
+async function playerChooseMove(index) {
+  const battle = state.battle;
+  if (!battle || battle.busy || state.screen !== "battle") return;
+
+  const attacker = activeMonster("player");
+  const move = attacker.moves[index];
+  if (!move) return;
+
+  battle.busy = true;
+  render();
+
+  const enemyAtStart = activeMonster("enemy");
+  await animateAndResolve("player", move);
+
+  const enemyWasKnockedOut = enemyAtStart.hp <= 0;
+  const outcome = handleFaints();
+
+  if (outcome.over) {
+    battle.busy = false;
+    render();
+    return;
+  }
+
+  // A rival sends out the next Pokémon after a knockout; it doesn't attack immediately.
+  if (enemyWasKnockedOut) {
+    battle.busy = false;
+    render();
+    return;
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+  if (state.screen === "battle") await takeEnemyTurn();
+
+  battle.busy = false;
+  render();
+}
+
+async function switchPokemon(index) {
+  const battle = state.battle;
+  if (!battle || battle.busy || state.screen !== "battle") return;
+  if (index === battle.playerIndex) return;
+
+  const next = battle.playerTeam[index];
+  if (!next || next.hp <= 0) return;
+
+  battle.busy = true;
+  const previous = activeMonster("player");
+  addLog(`Come back, ${formatName(previous.name)}!`);
+  battle.playerIndex = index;
+  addLog(`Go, ${formatName(next.name)}!`);
+  render();
+
+  await new Promise(resolve => setTimeout(resolve, 350));
+  if (state.screen === "battle") await takeEnemyTurn();
+
+  battle.busy = false;
+  render();
+}
+
+async function startBattle() {
+  if (state.loadingBattle || state.team.length !== 6) return;
+
+  const chosenEntries = [...state.team];
+  const chosenIds = new Set(chosenEntries.map(entry => entry.id));
+  const possibleRivals = state.dex.filter(entry => !chosenIds.has(entry.id));
+  const rivalEntries = shuffle(possibleRivals).slice(0, 6);
+
+  if (rivalEntries.length < 6) {
+    state.setupError = "There aren't enough catalogue entries to make a rival team.";
+    render();
+    return;
+  }
+
+  state.screen = "setup";
+  state.loadingBattle = true;
+  state.setupError = "";
+  render();
+
+  try {
+    const [playerData, enemyData] = await Promise.all([
+      Promise.all(chosenEntries.map(getPokemonDetails)),
+      Promise.all(rivalEntries.map(getPokemonDetails))
+    ]);
+
+    state.battle = {
+      playerTeam: playerData.map(makeBattler),
+      enemyTeam: enemyData.map(makeBattler),
+      playerIndex: 0,
+      enemyIndex: 0,
+      busy: false,
+      animation: null,
+      winner: null,
+      logs: []
+    };
+
+    state.screen = "battle";
+    state.loadingBattle = false;
+    addLog("A rival trainer challenges you!");
+    addLog(`Go, ${formatName(activeMonster("player").name)}!`);
+    addLog(`The rival sent out ${formatName(activeMonster("enemy").name)}!`);
+    render();
+  } catch (error) {
+    state.loadingBattle = false;
+    state.screen = "setup";
+    state.setupError = "The battle team couldn't be loaded. Check your connection and try again.";
+    render();
+  }
+}
+
+function renderTypePills(types) {
+  return types.map(type =>
+    `<span class="type-pill type-${escapeHTML(type)}">${escapeHTML(formatName(type))}</span>`
+  ).join("");
+}
+
+function hpPercent(monster) {
+  return Math.max(0, Math.min(100, Math.round((Math.max(0, monster.hp) / monster.maxHp) * 100)));
+}
+
+function renderPokemonPanel(monster) {
+  const percent = hpPercent(monster);
+  const hpClass = percent <= 20 ? "hp-fill--low" : percent <= 50 ? "hp-fill--mid" : "";
+
+  return `<div class="pokemon-panel">
+    <div class="mon-title">
+      <strong>${escapeHTML(formatName(monster.name))}</strong>
+      <span class="level">Lv. ${monster.level}</span>
+    </div>
+    <div class="type-row">${renderTypePills(monster.types)}</div>
+    <div class="hp-track"><div class="hp-fill ${hpClass}" style="width:${percent}%"></div></div>
+    <div class="hp-caption"><span>HP</span><span>${Math.max(0, monster.hp)} / ${monster.maxHp}</span></div>
+    ${monster.status
+      ? `<span class="status-pill status-pill--${escapeHTML(monster.status)}">${escapeHTML(formatStatus(monster.status))}</span>`
+      : ""}
+  </div>`;
+}
+
+function renderFighter(side) {
+  const monster = activeMonster(side);
+  const animation = state.battle.animation;
+  const attacking = animation?.actor === side;
+  const hit = animation && animation.actor !== side;
+  const impactColor = animation ? typeColor(animation.type) : "#fff";
+
+  return `<div class="fighter fighter--${side}">
+    ${renderPokemonPanel(monster)}
+    <div class="fighter-art ${attacking ? "is-attacking" : ""} ${hit ? "is-hit" : ""}">
+      ${imageMarkup(monster.image, monster.id, `${formatName(monster.name)} artwork`)}
+      ${hit ? `<span class="impact" style="--impact-color:${impactColor}"></span>` : ""}
+    </div>
+  </div>`;
+}
+
+function renderMoveButtons(battle) {
+  const player = activeMonster("player");
+
+  return player.moves.map((move, index) => `
+    <button class="move-button" data-move="${index}"
+      style="--move-color:${typeColor(move.type)}"
+      ${battle.busy ? "disabled" : ""}>
+      <span class="move-copy">
+        <strong>${escapeHTML(move.name)}</strong>
+        <small>${escapeHTML(formatName(move.type))} · ${escapeHTML(move.category)}</small>
+      </span>
+      <span class="move-power">${move.power}</span>
+    </button>
+  `).join("");
+}
+
+function renderSwitchButtons(battle) {
+  return battle.playerTeam.map((monster, index) => {
+    const isActive = index === battle.playerIndex;
+    const disabled = battle.busy || isActive || monster.hp <= 0;
+
+    return `<button class="switch-chip" data-switch="${index}" ${disabled ? "disabled" : ""}
+      title="${escapeHTML(formatName(monster.name))}${monster.hp <= 0 ? " — fainted" : ""}">
+      ${imageMarkup(monster.image, monster.id, formatName(monster.name))}
+      <span>${escapeHTML(formatName(monster.name))}</span>
+    </button>`;
+  }).join("");
+}
+
+function renderBattle() {
+  const battle = state.battle;
+  const player = activeMonster("player");
+
+  return `<main class="page">
+    <div class="battle-heading">
+      <div>
+        <div class="eyebrow">Live battle · Level ${LEVEL}</div>
+        <h2>Your team vs. a rival</h2>
+        <p>Pick a move or switch Pokémon. Type matchups can turn the battle around.</p>
+      </div>
+      <button class="button button-quiet" data-back-team ${battle.busy ? "disabled" : ""}>← Team builder</button>
+    </div>
+
+    <section class="arena" aria-label="Battle arena">
+      <div class="arena-ground"></div>
+      <div class="arena-hill left"></div>
+      <div class="arena-hill right"></div>
+      <div class="arena-ring enemy"></div>
+      <div class="arena-ring player"></div>
+      <div class="arena-stamp arena-stamp--enemy">RIVAL</div>
+      <div class="arena-stamp arena-stamp--player">YOU</div>
+      <div class="versus-mark">VS</div>
+      ${renderFighter("enemy")}
+      ${renderFighter("player")}
+    </section>
+
+    <div class="battle-console">
+      <section class="console-panel">
+        <div class="console-title">
+          <h3>Battle log</h3>
+          <span class="turn-indicator">${battle.busy ? "In action" : "Your turn"}</span>
+        </div>
+        <div class="battle-log">
+          ${battle.logs.slice(-5).reverse().map((line, index) =>
+            `<p class="log-line ${index === 0 ? "latest" : ""}">${escapeHTML(line)}</p>`
+          ).join("")}
+        </div>
+        <p class="battle-tip">Moves use familiar Pokémon attacks. Same-type attacks get a bonus, and type advantages or resistances affect damage.</p>
+      </section>
+
+      <section class="console-panel">
+        <div class="console-title">
+          <h3>What will ${escapeHTML(formatName(player.name))} do?</h3>
+          <span class="turn-indicator">Choose a move</span>
+        </div>
+        <div class="move-grid">${renderMoveButtons(battle)}</div>
+        <div class="switch-heading"><span>Switch Pokémon</span><span>Your team</span></div>
+        <div class="switch-list">${renderSwitchButtons(battle)}</div>
+      </section>
+    </div>
+  </main>`;
+}
+
+function renderRoster(team) {
+  return team.map(monster => `
+    <div class="result-mon ${monster.hp <= 0 ? "fainted" : ""}">
+      ${imageMarkup(monster.image, monster.id, formatName(monster.name))}
+      <strong>${escapeHTML(formatName(monster.name))}</strong>
+      <small>${monster.hp <= 0 ? "Fainted" : `${hpPercent(monster)}% HP`}</small>
+    </div>
+  `).join("");
+}
+
+function renderResult() {
+  const battle = state.battle;
+  const won = battle.winner === "player";
+  const standing = battle.playerTeam.filter(monster => monster.hp > 0).length;
+
+  return `<main class="page">
+    <section class="result-wrap">
+      <div class="result-icon">${won ? "🏆" : "💫"}</div>
+      <div class="eyebrow">${won ? "Battle won" : "Battle complete"}</div>
+      <h2>${won ? "Victory!" : "Good battle!"}</h2>
+      <p>${won
+        ? "Your team defeated the rival trainer. Want to take on another team?"
+        : "Your rival won this round. Edit your team or jump back in for another battle."}</p>
+
+      <div class="result-stats">
+        <div class="result-stat"><strong>${standing} / 6</strong><span>Your Pokémon standing</span></div>
+        <div class="result-stat"><strong>${battle.enemyTeam.filter(monster => monster.hp <= 0).length} / 6</strong><span>Rival Pokémon defeated</span></div>
+      </div>
+
+      <div class="result-rosters">
+        <div class="roster-box">
+          <h3>Your team</h3>
+          <div class="roster-list">${renderRoster(battle.playerTeam)}</div>
+        </div>
+        <div class="roster-box">
+          <h3>Rival team</h3>
+          <div class="roster-list">${renderRoster(battle.enemyTeam)}</div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="button button-primary" data-rematch>⚔ Battle again</button>
+        <button class="button button-quiet" data-edit-team>✎ Edit team</button>
+      </div>
+    </section>
+  </main>`;
+}
+
+app.addEventListener("input", event => {
+  if (event.target && event.target.id === "pokemon-search") {
+    state.search = event.target.value;
+    const results = document.getElementById("search-results");
+    if (results) results.innerHTML = renderSearchResults();
+  }
+});
+
+app.addEventListener("click", async event => {
+  const button = event.target.closest("button");
+  if (!button) return;
+
+  if (button.hasAttribute("data-retry")) {
+    loadDex();
+    return;
+  }
+
+  if (button.hasAttribute("data-add-id")) {
+    if (state.loadingBattle || state.team.length >= 6) return;
+    const entry = state.dex.find(item => item.id === Number(button.dataset.addId));
+    if (entry && !state.team.some(item => item.id === entry.id)) {
+      state.team.push(entry);
+      state.search = "";
+      render();
+    }
+    return;
+  }
+
+  if (button.hasAttribute("data-remove")) {
+    if (state.loadingBattle) return;
+    state.team.splice(Number(button.dataset.remove), 1);
+    render();
+    return;
+  }
+
+  if (button.hasAttribute("data-random-team")) {
+    if (state.loadingBattle) return;
+    state.team = shuffle(state.dex).slice(0, 6);
+    state.search = "";
+    state.setupError = "";
+    render();
+    return;
+  }
+
+  if (button.hasAttribute("data-start")) {
+    startBattle();
+    return;
+  }
+
+  if (button.hasAttribute("data-move")) {
+    playerChooseMove(Number(button.dataset.move));
+    return;
+  }
+
+  if (button.hasAttribute("data-switch")) {
+    switchPokemon(Number(button.dataset.switch));
+    return;
+  }
+
+  if (button.hasAttribute("data-back-team") || button.hasAttribute("data-edit-team")) {
+    if (state.battle?.busy) return;
+    state.battle = null;
+    state.screen = "setup";
+    state.setupError = "";
+    render();
+    return;
+  }
+
+  if (button.hasAttribute("data-rematch")) {
+    startBattle();
+  }
+});
+
+render();
+loadDex();
+</script>
+</body>
+</html>
+```
