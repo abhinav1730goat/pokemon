@@ -1,0 +1,508 @@
+# Poke Battle Arena
+
+This is a single-file browser game. It pulls every Pokémon and move from the [PokeAPI](https://pokeapi.co), so you can pick any of the 1,025 Pokémon species for your team. Each Pokémon gets real moves like Thunderbolt, Flamethrower, or Hydro Pump, and battles use type matchups, STAB, and speed-based turn order.
+
+## How to run it
+
+1. Copy the code below into a file named `index.html`.
+2. Open it in any modern browser. An internet connection is required.
+
+## The code
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poke Battle Arena</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Trebuchet MS", Arial, sans-serif; min-height: 100vh;
+    background: linear-gradient(160deg, #1d3b8f, #3d7bd9 60%, #8fd3ff); color: #222;
+  }
+  h1 { text-align: center; color: #fff; margin: 18px 0; text-shadow: 3px 3px 0 #123; }
+  .panel {
+    background: rgba(255,255,255,.95); border-radius: 14px; padding: 16px;
+    margin: 10px auto; max-width: 1100px; box-shadow: 0 6px 18px rgba(0,0,0,.3);
+  }
+  .hidden { display: none !important; }
+  #search {
+    width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #3d7bd9;
+  }
+  #count { margin-top: 8px; font-weight: bold; }
+  .slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 10px; }
+  .slot {
+    background: #e8ecf5; border-radius: 10px; min-height: 120px; text-align: center;
+    padding: 6px; font-size: 13px; cursor: pointer;
+  }
+  .slot.empty { cursor: default; color: #888; display: flex; align-items: center; justify-content: center; }
+  .slot img { width: 72px; height: 72px; image-rendering: pixelated; }
+  .slot small { color: #777; }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+    gap: 8px; max-height: 360px; overflow: auto; margin-top: 12px; padding: 4px;
+  }
+  .card {
+    background: #f1f5ff; border-radius: 10px; text-align: center; padding: 4px;
+    cursor: pointer; font-size: 13px; border: 2px solid transparent;
+  }
+  .card:hover { border-color: #3d7bd9; }
+  .card.sel { opacity: .35; cursor: default; }
+  .card img { width: 72px; height: 72px; image-rendering: pixelated; }
+  button {
+    font-size: 15px; padding: 10px 14px; border: none; border-radius: 8px;
+    background: #ffcb05; color: #222; font-weight: bold; cursor: pointer; margin: 4px;
+  }
+  button:disabled { background: #bbb; cursor: not-allowed; }
+  button:not(:disabled):hover { filter: brightness(1.08); }
+  #startBtn { font-size: 20px; padding: 14px 30px; }
+  .arena { display: flex; gap: 16px; flex-wrap: wrap; }
+  .fighter {
+    flex: 1; min-width: 300px; display: flex; align-items: center; gap: 12px;
+    background: rgba(0,0,0,.05); border-radius: 12px; padding: 10px;
+  }
+  .sprite { width: 120px; height: 120px; image-rendering: pixelated; }
+  .name { font-size: 20px; font-weight: bold; }
+  .type {
+    color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 12px;
+    text-transform: uppercase; margin-right: 4px; text-shadow: 1px 1px 1px #000;
+  }
+  .hp { background: #333; height: 12px; border-radius: 6px; overflow: hidden; width: 220px; margin-top: 6px; }
+  .hp div { height: 100%; transition: width .4s; }
+  #prompt { font-size: 18px; font-weight: bold; margin: 14px 0 6px; text-align: center; }
+  .moves { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .move {
+    color: #fff; text-shadow: 1px 1px 2px #000; padding: 12px; font-size: 16px; border-radius: 10px;
+  }
+  .bench button { display: inline-flex; align-items: center; gap: 4px; }
+  .bench img { width: 40px; height: 40px; image-rendering: pixelated; }
+  .log {
+    background: #1e1e1e; color: #eee; border-radius: 10px; height: 200px; overflow: auto;
+    padding: 10px; font-family: Consolas, monospace; font-size: 14px;
+  }
+  .log div { margin-bottom: 4px; }
+  #endBox { text-align: center; margin-top: 12px; }
+  #status { text-align: center; font-weight: bold; color: #345; }
+</style>
+</head>
+<body>
+
+<h1>⚡ Poke Battle Arena ⚡</h1>
+
+<!-- TEAM BUILDER -->
+<div id="builder" class="panel">
+  <h2>1. Build your team of 6 (any Pokémon!)</h2>
+  <input id="search" placeholder="Search any Pokémon by name or number (e.g. pikachu, 150)..." oninput="renderBuilder()">
+  <div id="count"></div>
+  <div class="slots" id="slots"></div>
+  <div style="text-align:center; margin-top:10px;">
+    <button id="startBtn" disabled onclick="startBattle()">Start Battle!</button>
+  </div>
+  <div class="grid" id="results"></div>
+  <p id="status"></p>
+</div>
+
+<!-- BATTLE -->
+<div id="battle" class="panel hidden">
+  <div class="arena">
+    <div class="fighter"><div id="foeInfo"></div><img id="foeImg" class="sprite"></div>
+    <div class="fighter"><img id="myImg" class="sprite"><div id="myInfo"></div></div>
+  </div>
+  <div id="prompt"></div>
+  <div id="moves" class="moves"></div>
+  <h3>Your Team</h3>
+  <div id="bench" class="bench"></div>
+  <h3>Battle Log</h3>
+  <div id="log" class="log"></div>
+  <div id="endBox" class="hidden">
+    <h2 id="endMsg"></h2>
+    <button onclick="location.reload()">Play Again</button>
+  </div>
+</div>
+
+<script>
+/* ---------- CONFIG & HELPERS ---------- */
+const API = "https://pokeapi.co/api/v2";
+const SPRITE = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+const TYPES = ["normal","fire","water","electric","grass","ice","fighting","poison","ground",
+               "flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"];
+const TYPE_COLORS = {
+  normal:"#A8A77A", fire:"#EE8130", water:"#6390F0", electric:"#F7D02C", grass:"#7AC74C",
+  ice:"#96D9D6", fighting:"#C22E28", poison:"#A33EA1", ground:"#E2BF65", flying:"#A98FF3",
+  psychic:"#F95587", bug:"#A6B91A", rock:"#B6A136", ghost:"#735797", dragon:"#6F35FC",
+  dark:"#705746", steel:"#B7B7CE", fairy:"#D685AD"
+};
+const BANG = ["POW!", "BAM!", "WHAM!", "KAPOW!", "ZAP!", "BOOM!", "THWACK!"];
+
+const $ = id => document.getElementById(id);
+const cap = s => s.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const cache = {};
+function getJSON(url) {
+  if (!cache[url]) {
+    cache[url] = fetch(url)
+      .then(r => { if (!r.ok) throw new Error("Request failed: " + url); return r.json(); })
+      .catch(e => { delete cache[url]; throw e; });
+  }
+  return cache[url];
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* ---------- GLOBAL STATE ---------- */
+let allPokemon = [], byId = {}, typeChart = {};
+let team = [];                 // ids chosen in builder
+let player = [], cpu = [];     // battle objects
+let pActive = 0, cActive = 0;
+let needSwitch = false, over = false;
+let logLines = [];
+
+const myMon = () => player[pActive];
+const foeMon = () => cpu[cActive];
+
+/* ---------- LOADING ---------- */
+async function init() {
+  try {
+    $("status").textContent = "Loading the Pokédex from PokeAPI...";
+    const [list, ...types] = await Promise.all([
+      getJSON(`${API}/pokemon?limit=2000`),
+      ...TYPES.map(t => getJSON(`${API}/type/${t}`))
+    ]);
+    allPokemon = list.results
+      .map(p => ({ name: p.name, id: +p.url.split("/").filter(Boolean).pop() }))
+      .filter(p => p.id < 10000); // species only (skip alternate forms)
+    byId = Object.fromEntries(allPokemon.map(p => [p.id, p]));
+
+    for (const t of types) {
+      const r = t.damage_relations;
+      typeChart[t.name] = {
+        double: r.double_damage_to.map(x => x.name),
+        half:   r.half_damage_to.map(x => x.name),
+        none:   r.no_damage_to.map(x => x.name)
+      };
+    }
+    $("status").textContent = "";
+    renderBuilder();
+  } catch (e) {
+    $("status").textContent = "Couldn't load PokeAPI: " + e.message;
+  }
+}
+
+/* ---------- TEAM BUILDER ---------- */
+function renderBuilder() {
+  const q = $("search").value.trim().toLowerCase();
+  const matches = allPokemon
+    .filter(p => !q || p.name.includes(q) || String(p.id) === q)
+    .slice(0, 120);
+
+  $("results").innerHTML = matches.map(p => `
+    <div class="card ${team.includes(p.id) ? "sel" : ""}" onclick="addToTeam(${p.id})">
+      <img loading="lazy" src="${SPRITE(p.id)}">
+      <div>#${p.id}<br>${cap(p.name)}</div>
+    </div>`).join("") || "<p>No Pokémon found.</p>";
+
+  $("slots").innerHTML = [0,1,2,3,4,5].map(i => {
+    const id = team[i];
+    if (!id) return `<div class="slot empty">Empty</div>`;
+    return `<div class="slot" onclick="removeFromTeam(${i})">
+      <img src="${SPRITE(id)}"><div>${cap(byId[id].name)}</div><small>click to remove</small>
+    </div>`;
+  }).join("");
+
+  $("count").textContent = `${team.length} / 6 chosen`;
+  $("startBtn").disabled = team.length !== 6;
+}
+function addToTeam(id) {
+  if (team.length < 6 && !team.includes(id)) { team.push(id); renderBuilder(); }
+}
+function removeFromTeam(i) { team.splice(i, 1); renderBuilder(); }
+
+/* ---------- BUILDING BATTLE POKEMON ---------- */
+function toMove(md) {
+  const en = md.flavor_text_entries.find(e => e.language.name === "en");
+  return {
+    name: cap(md.name),
+    type: md.type.name,
+    power: md.power,
+    accuracy: md.accuracy,          // null = never misses
+    cls: md.damage_class.name,      // physical / special
+    desc: en ? en.flavor_text.replace(/\s+/g, " ") : "A powerful attack!"
+  };
+}
+
+async function pickMoves(d) {
+  // Moves this Pokémon learns by leveling up, shuffled so each battle feels different
+  const learnable = d.moves
+    .filter(m => m.version_group_details.some(v => v.move_learn_method.name === "level-up"))
+    .map(m => m.move);
+  shuffle(learnable);
+
+  const picked = [];
+  for (let i = 0; i < learnable.length && picked.length < 4; i += 8) {
+    const batch = await Promise.all(
+      learnable.slice(i, i + 8).map(m => getJSON(m.url).catch(() => null))
+    );
+    for (const md of batch) {
+      if (md && picked.length < 4 && md.power && md.damage_class.name !== "status") {
+        picked.push(toMove(md));
+      }
+    }
+  }
+  if (picked.length === 0) picked.push(toMove(await getJSON(`${API}/move/tackle`)));
+  return picked;
+}
+
+async function makeBattler(id) {
+  const d = await getJSON(`${API}/pokemon/${id}`);
+  const base = {};
+  d.stats.forEach(s => base[s.stat.name] = s.base_stat);
+
+  // Simplified level-50 stat formula (31 IVs, 84 EVs)
+  const calc = b => Math.floor((2 * b + 31 + 21) * 50 / 100);
+  const stats = {
+    attack: calc(base.attack) + 5,
+    defense: calc(base.defense) + 5,
+    "special-attack": calc(base["special-attack"]) + 5,
+    "special-defense": calc(base["special-defense"]) + 5,
+    speed: calc(base.speed) + 5
+  };
+  const maxHp = calc(base.hp) + 60;
+
+  return {
+    id,
+    name: cap(d.name),
+    types: d.types.map(t => t.type.name),
+    frontSprite: d.sprites.front_default || SPRITE(id),
+    backSprite: d.sprites.back_default || d.sprites.front_default || SPRITE(id),
+    stats, maxHp, hp: maxHp,
+    moves: await pickMoves(d)
+  };
+}
+
+function pickRandomIds(n) {
+  return shuffle([...allPokemon]).slice(0, n).map(p => p.id);
+}
+
+/* ---------- BATTLE MATH ---------- */
+function effectiveness(atkType, defTypes) {
+  const c = typeChart[atkType];
+  if (!c) return 1;
+  let m = 1;
+  for (const d of defTypes) {
+    if (c.double.includes(d)) m *= 2;
+    else if (c.half.includes(d)) m *= 0.5;
+    else if (c.none.includes(d)) m *= 0;
+  }
+  return m;
+}
+
+function calcDamage(att, def, move) {
+  const phys = move.cls === "physical";
+  const A = phys ? att.stats.attack : att.stats["special-attack"];
+  const D = phys ? def.stats.defense : def.stats["special-defense"];
+  // Classic formula at level 50
+  const base = Math.floor(Math.floor(Math.floor(2 * 50 / 5 + 2) * move.power * A / D) / 50) + 2;
+  const stab = att.types.includes(move.type) ? 1.5 : 1;
+  const eff = effectiveness(move.type, def.types);
+  const rand = 0.85 + Math.random() * 0.15;
+  const dmg = eff === 0 ? 0 : Math.max(1, Math.floor(base * stab * eff * rand));
+  return { dmg, eff };
+}
+
+function cpuPick(mon, target) {
+  if (Math.random() < 0.7) {               // usually picks the strongest move
+    let best = mon.moves[0], bestDmg = -1;
+    for (const m of mon.moves) {
+      const d = calcDamage(mon, target, m).dmg;
+      if (d > bestDmg) { bestDmg = d; best = m; }
+    }
+    return best;
+  }
+  return mon.moves[Math.floor(Math.random() * mon.moves.length)];
+}
+
+/* ---------- BATTLE FLOW ---------- */
+function addLog(text) { logLines.push(text); }
+
+function attack(att, def, move) {
+  if (att.hp <= 0 || def.hp <= 0) return;
+  addLog(`<b>${att.name}</b> used <b>${move.name}</b>!`);
+
+  if (move.accuracy && Math.random() * 100 > move.accuracy) {
+    addLog("...but it missed!");
+    return;
+  }
+  const { dmg, eff } = calcDamage(att, def, move);
+  if (eff === 0) { addLog(`It doesn't affect ${def.name}...`); return; }
+
+  def.hp = Math.max(0, def.hp - dmg);
+  addLog(`💥 ${BANG[Math.floor(Math.random() * BANG.length)]} ${dmg} damage!`);
+  if (eff > 1) addLog("🔥 It's super effective!");
+  else if (eff < 1) addLog("It's not very effective...");
+  if (def.hp === 0) addLog(`${def.name} fainted!`);
+}
+
+function turn(action) {
+  if (action.kind === "switch") {
+    addLog(`${myMon().name}, come back!`);
+    pActive = action.idx;
+    addLog(`Go, <b>${myMon().name}</b>!`);
+    attack(foeMon(), myMon(), cpuPick(foeMon(), myMon())); // foe gets a free hit
+  } else {
+    const pm = myMon().moves[action.idx];
+    const cm = cpuPick(foeMon(), myMon());
+    const pSpeed = myMon().stats.speed, cSpeed = foeMon().stats.speed;
+    const playerFirst = pSpeed > cSpeed || (pSpeed === cSpeed && Math.random() < 0.5);
+
+    if (playerFirst) {
+      attack(myMon(), foeMon(), pm);
+      attack(foeMon(), myMon(), cm);
+    } else {
+      attack(foeMon(), myMon(), cm);
+      attack(myMon(), foeMon(), pm);
+    }
+  }
+  checkFaints();
+  renderBattle();
+}
+
+function checkFaints() {
+  if (myMon().hp <= 0) {
+    if (player.some(m => m.hp > 0)) {
+      needSwitch = true;
+      addLog(`${myMon().name} fainted! Choose your next Pokémon.`);
+    } else return endGame(false);
+  }
+  if (foeMon().hp <= 0) {
+    if (cpu.some(m => m.hp > 0)) {
+      cActive = cpu.findIndex(m => m.hp > 0);
+      addLog(`Foe sends out <b>${foeMon().name}</b>!`);
+    } else return endGame(true);
+  }
+}
+
+function endGame(won) {
+  over = true;
+  addLog(won ? "🏆 You won the battle!" : "💀 You lost the battle...");
+  $("endMsg").textContent = won ? "🏆 VICTORY! 🏆" : "💀 Defeated...";
+}
+
+/* ---------- PLAYER ACTIONS ---------- */
+function act(i) {
+  if (over || needSwitch) return;
+  turn({ kind: "move", idx: i });
+}
+
+function switchTo(i) {
+  if (over) return;
+  const m = player[i];
+  if (m.hp <= 0 || (i === pActive && !needSwitch)) return;
+  if (needSwitch) {
+    // Free switch after a faint: the foe does not attack
+    pActive = i;
+    needSwitch = false;
+    addLog(`Go, <b>${m.name}</b>!`);
+    renderBattle();
+  } else {
+    turn({ kind: "switch", idx: i });
+  }
+}
+
+/* ---------- RENDERING ---------- */
+function hpBar(m) {
+  const pct = Math.max(0, m.hp / m.maxHp * 100);
+  const col = pct > 50 ? "#4caf50" : pct > 20 ? "#ffc107" : "#f44336";
+  return `<div class="hp"><div style="width:${pct}%;background:${col}"></div></div>
+          <small>${m.hp} / ${m.maxHp} HP</small>`;
+}
+
+function infoHTML(m) {
+  const badges = m.types.map(t =>
+    `<span class="type" style="background:${TYPE_COLORS[t] || "#777"}">${t}</span>`).join("");
+  return `<div class="name">${m.name} <small>Lv50</small></div>${badges}${hpBar(m)}`;
+}
+
+function renderBattle() {
+  const P = myMon(), C = foeMon();
+
+  $("foeImg").src = C.frontSprite;
+  $("foeImg").style.opacity = C.hp > 0 ? 1 : 0.3;
+  $("myImg").src = P.backSprite;
+  $("myImg").style.opacity = P.hp > 0 ? 1 : 0.3;
+  $("foeInfo").innerHTML = infoHTML(C);
+  $("myInfo").innerHTML = infoHTML(P);
+
+  $("prompt").textContent = over ? "" :
+    needSwitch ? "Choose your next Pokémon!" : `What will ${P.name} do?`;
+
+  $("moves").innerHTML = (over || needSwitch) ? "" : P.moves.map((m, i) => `
+    <button class="move" style="background:${TYPE_COLORS[m.type] || "#777"}"
+            title="${m.desc.replace(/"/g, "&quot;")}" onclick="act(${i})">
+      ${m.name}<br>
+      <small>${m.type.toUpperCase()} · ${m.cls} · Power ${m.power ?? "—"} · Acc ${m.accuracy ?? "—"}</small>
+    </button>`).join("");
+
+  $("bench").innerHTML = player.map((m, i) => {
+    const disabled = over || m.hp <= 0 || (i === pActive && !needSwitch);
+    return `<button ${disabled ? "disabled" : ""} onclick="switchTo(${i})">
+      <img src="${m.frontSprite}"> ${m.name} ${m.hp <= 0 ? "💀" : `(${m.hp}/${m.maxHp})`}
+    </button>`;
+  }).join("");
+
+  $("log").innerHTML = logLines.slice(-60).map(l => `<div>${l}</div>`).join("");
+  $("log").scrollTop = $("log").scrollHeight;
+  $("endBox").classList.toggle("hidden", !over);
+}
+
+async function startBattle() {
+  $("startBtn").disabled = true;
+  $("status").textContent = "Building both teams (fetching moves)...";
+  try {
+    const [mine, theirs] = await Promise.all([
+      Promise.all(team.map(makeBattler)),
+      Promise.all(pickRandomIds(6).map(makeBattler))
+    ]);
+    player = mine;
+    cpu = theirs;
+  } catch (e) {
+    $("status").textContent = "Error: " + e.message;
+    $("startBtn").disabled = false;
+    return;
+  }
+
+  pActive = 0; cActive = 0; needSwitch = false; over = false; logLines = [];
+  addLog(`Foe sends out <b>${foeMon().name}</b>!`);
+  addLog(`Go, <b>${myMon().name}</b>!`);
+
+  $("builder").classList.add("hidden");
+  $("battle").classList.remove("hidden");
+  renderBattle();
+}
+
+init();
+</script>
+</body>
+</html>
+```
+
+## Features
+
+- **Choose any Pokémon:** all 1,025 species are searchable by name or National Dex number.
+- **Team of 6:** build your team, remove members, and start when you have six.
+- **Cartoon-style attacks:** each Pokémon gets 4 real attacking moves (such as Thunderbolt, Earthquake, or Hydro Pump), each with a type, power, accuracy, and description on hover.
+- **Battle system:** type effectiveness ("super effective" / "not very effective" / "no effect"), same-type attack bonus (STAB), speed-based turn order, accuracy checks, and random damage variance.
+- **Switching:** swap Pokémon during battle, and pick a replacement when yours faints.
+- **CPU opponent:** the foe gets a random team of six and usually uses its strongest move.
+
+## Ideas to extend it
+
+- Let players choose moves from each Pokémon's full move list instead of random picks.
+- Add status moves (burn, paralysis, sleep) and stat boosts.
+- Add a Random Team button or a "Team Preview" screen.
+- Add cartoon-style sound effects or animations for each attack.
